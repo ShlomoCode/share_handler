@@ -272,6 +272,8 @@ class ShareHandlerPlugin : FlutterPlugin, Messages.ShareHandlerApi, EventChannel
   private fun getFileInfoFromUri(contentResolver: ContentResolver, uri: Uri, mimeType: String?): Pair<String?, Long?> {
     var fileName: String? = null
     var lastModified: Long? = null
+    // Use the provider's default columns: requesting both last_modified and
+    // date_modified explicitly can fail when one is unsupported.
     val cursor = contentResolver.query(uri, null, null, null, null)
     cursor?.use { c ->
       if (c.moveToFirst()) {

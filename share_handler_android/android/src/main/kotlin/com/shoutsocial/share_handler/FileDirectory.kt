@@ -95,6 +95,8 @@ object FileDirectory {
             var targetFile: File? = null
             var lastModified: Long? = null
             try {
+                // Use the provider's default columns: requesting both last_modified and
+                // date_modified explicitly can fail when one is unsupported.
                 cursor = context.contentResolver.query(uri, null, selection, selectionArgs, null)
                 if (cursor != null && cursor.moveToFirst()) {
                     val columnIndex = cursor.getColumnIndexOrThrow(column)
