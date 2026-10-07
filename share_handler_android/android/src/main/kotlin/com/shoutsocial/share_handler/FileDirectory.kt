@@ -1,6 +1,7 @@
 package com.shoutsocial.share_handler
 
 import android.content.ContentUris
+import android.content.ContentResolver
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
@@ -125,6 +126,7 @@ object FileDirectory {
                 FileOutputStream(targetFile).use { fileOut ->
                     input.copyTo(fileOut)
                 }
+                reapplyLastModified(context.contentResolver, uri, targetFile)
             }
             return targetFile.path
         }
@@ -145,6 +147,29 @@ object FileDirectory {
         return null
     }
 
+
+    fun reapplyLastModified(resolver: ContentResolver, uri: Uri, file: File) {
+        try {
+            resolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (!cursor.moveToFirst()) return
+                val columns = listOf(
+                    DocumentsContract.Document.COLUMN_LAST_MODIFIED to 1L,
+                    MediaStore.MediaColumns.DATE_MODIFIED to 1000L,
+                )
+                for ((column, multiplier) in columns) {
+                    val index = cursor.getColumnIndex(column)
+                    if (index < 0 || cursor.isNull(index)) continue
+                    val timestamp = cursor.getLong(index)
+                    if (timestamp <= 0 || timestamp > Long.MAX_VALUE / multiplier) continue
+                    // Documents use milliseconds; MediaStore uses seconds.
+                    file.setLastModified(timestamp * multiplier)
+                    return
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("FileDirectory", "Could not preserve last-modified timestamp", e)
+        }
+    }
 
     /**
      * @param uri The Uri to check.

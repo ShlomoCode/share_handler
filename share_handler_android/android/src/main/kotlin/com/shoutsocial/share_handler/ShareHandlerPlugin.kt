@@ -306,6 +306,7 @@ class ShareHandlerPlugin : FlutterPlugin, Messages.ShareHandlerApi, EventChannel
             outputStream.write(buffer, 0, bytesRead)
           }
         }
+        FileDirectory.reapplyLastModified(contentResolver, uri, destinationFile)
       }
       true
     } catch (e: Exception) {
