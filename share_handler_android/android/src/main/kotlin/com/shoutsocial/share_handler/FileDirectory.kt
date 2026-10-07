@@ -92,10 +92,12 @@ object FileDirectory {
         if (uri.authority != null && selection==null) {
             var cursor: Cursor? = null
             val column = "_display_name"
-            val projection = arrayOf(column)
             var targetFile: File? = null
+            var lastModified: Long? = null
             try {
-                cursor = context.contentResolver.query(uri, projection, selection, selectionArgs, null)
+                // Use the provider's default columns: requesting both last_modified and
+                // date_modified explicitly will fail with providers that reject unsupported columns.
+                cursor = context.contentResolver.query(uri, null, selection, selectionArgs, null)
                 if (cursor != null && cursor.moveToFirst()) {
                     val columnIndex = cursor.getColumnIndexOrThrow(column)
                     val fileName: String? = cursor.getString(columnIndex)
@@ -103,6 +105,7 @@ object FileDirectory {
                     if (!fileName.isNullOrBlank()) {
                         targetFile = File(context.cacheDir, fileName)
                     }
+                    lastModified = readLastModified(cursor)
                 }
             } finally {
                 cursor?.close()
@@ -125,6 +128,7 @@ object FileDirectory {
                 FileOutputStream(targetFile).use { fileOut ->
                     input.copyTo(fileOut)
                 }
+                reapplyLastModified(targetFile, lastModified)
             }
             return targetFile.path
         }
@@ -145,6 +149,34 @@ object FileDirectory {
         return null
     }
 
+
+    fun readLastModified(cursor: Cursor): Long? {
+        try {
+            // Documents use milliseconds; fall back to MediaStore's seconds.
+            return readTimestampMillis(cursor, DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                ?: readTimestampMillis(cursor, MediaStore.MediaColumns.DATE_MODIFIED, millisecondsPerUnit = 1000L)
+        } catch (e: Exception) {
+            Log.w("FileDirectory", "Could not read last-modified timestamp", e)
+        }
+        return null
+    }
+
+    private fun readTimestampMillis(cursor: Cursor, column: String, millisecondsPerUnit: Long = 1L): Long? {
+        val index = cursor.getColumnIndex(column)
+        if (index < 0 || cursor.isNull(index)) return null
+        val timestamp = cursor.getLong(index)
+        if (timestamp <= 0 || timestamp > Long.MAX_VALUE / millisecondsPerUnit) return null
+        return timestamp * millisecondsPerUnit
+    }
+
+    fun reapplyLastModified(file: File, lastModified: Long?) {
+        if (lastModified == null) return
+        try {
+            file.setLastModified(lastModified)
+        } catch (e: Exception) {
+            Log.w("FileDirectory", "Could not preserve last-modified timestamp", e)
+        }
+    }
 
     /**
      * @param uri The Uri to check.
