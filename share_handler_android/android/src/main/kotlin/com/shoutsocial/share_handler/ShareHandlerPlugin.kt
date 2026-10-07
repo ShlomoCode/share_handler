@@ -273,7 +273,7 @@ class ShareHandlerPlugin : FlutterPlugin, Messages.ShareHandlerApi, EventChannel
     var fileName: String? = null
     var lastModified: Long? = null
     // Use the provider's default columns: requesting both last_modified and
-    // date_modified explicitly can fail when one is unsupported.
+    // date_modified explicitly will fail with providers that reject unsupported columns.
     val cursor = contentResolver.query(uri, null, null, null, null)
     cursor?.use { c ->
       if (c.moveToFirst()) {
