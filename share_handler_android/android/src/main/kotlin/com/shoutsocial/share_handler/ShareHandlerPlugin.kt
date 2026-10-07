@@ -244,15 +244,15 @@ class ShareHandlerPlugin : FlutterPlugin, Messages.ShareHandlerApi, EventChannel
     } else {
       // File does not have an extension; copy it to cache with the correct extension
 
-      // Obtain the file name and modification time from the same query.
-      val (fileName, lastModified) = getFileInfoFromUri(contentResolver, uri, mimeType)
-      if (fileName == null) return null
+      // Obtain the file name, including its extension, and modification time from the same query.
+      val fileInfo = getFileInfoFromUri(contentResolver, uri, mimeType)
+      val fileName = fileInfo.name ?: return null
 
       // Create a new file in the cache directory with the correct file name
       val newFile = File(applicationContext.cacheDir, fileName)
 
       // Copy the contents from the URI to the new file
-      val success = copyFile(contentResolver, uri, newFile, lastModified)
+      val success = copyFile(contentResolver, uri, newFile, lastModified = fileInfo.lastModified)
       if (!success) {
         return null
       }
@@ -268,8 +268,10 @@ class ShareHandlerPlugin : FlutterPlugin, Messages.ShareHandlerApi, EventChannel
     }
   }
 
+  private data class SharedFileInfo(val name: String?, val lastModified: Long?)
+
   // Read the file name and modification time from the URI.
-  private fun getFileInfoFromUri(contentResolver: ContentResolver, uri: Uri, mimeType: String?): Pair<String?, Long?> {
+  private fun getFileInfoFromUri(contentResolver: ContentResolver, uri: Uri, mimeType: String?): SharedFileInfo {
     var fileName: String? = null
     var lastModified: Long? = null
     // Use the provider's default columns: requesting both last_modified and
@@ -297,7 +299,7 @@ class ShareHandlerPlugin : FlutterPlugin, Messages.ShareHandlerApi, EventChannel
       }
     }
 
-    return fileName to lastModified
+    return SharedFileInfo(name = fileName, lastModified = lastModified)
   }
 
   // Function to copy the file content from the URI to the destination file

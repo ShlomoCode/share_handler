@@ -152,22 +152,21 @@ object FileDirectory {
 
     fun readLastModified(cursor: Cursor): Long? {
         try {
-            val columns = listOf(
-                DocumentsContract.Document.COLUMN_LAST_MODIFIED to 1L,
-                MediaStore.MediaColumns.DATE_MODIFIED to 1000L,
-            )
-            for ((column, multiplier) in columns) {
-                val index = cursor.getColumnIndex(column)
-                if (index < 0 || cursor.isNull(index)) continue
-                val timestamp = cursor.getLong(index)
-                if (timestamp <= 0 || timestamp > Long.MAX_VALUE / multiplier) continue
-                // Documents use milliseconds; MediaStore uses seconds.
-                return timestamp * multiplier
-            }
+            // Documents use milliseconds; fall back to MediaStore's seconds.
+            return readTimestampMillis(cursor, DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                ?: readTimestampMillis(cursor, MediaStore.MediaColumns.DATE_MODIFIED, millisecondsPerUnit = 1000L)
         } catch (e: Exception) {
             Log.w("FileDirectory", "Could not read last-modified timestamp", e)
         }
         return null
+    }
+
+    private fun readTimestampMillis(cursor: Cursor, column: String, millisecondsPerUnit: Long = 1L): Long? {
+        val index = cursor.getColumnIndex(column)
+        if (index < 0 || cursor.isNull(index)) return null
+        val timestamp = cursor.getLong(index)
+        if (timestamp <= 0 || timestamp > Long.MAX_VALUE / millisecondsPerUnit) return null
+        return timestamp * millisecondsPerUnit
     }
 
     fun reapplyLastModified(file: File, lastModified: Long?) {
